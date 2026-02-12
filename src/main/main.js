@@ -20,11 +20,11 @@ function createMainWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js')
+      preload: path.join(__dirname, '../preload/preload.js')
     }
   });
 
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, '../index.html'));
 
   mainWindow.on('closed', function () {
     mainWindow = null;

@@ -2,7 +2,7 @@
   "name": "electron-openapi-mock",
   "version": "1.0.0",
   "description": "Electron app for uploading OpenAPI specs and running mock servers",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
     "build": "electron-builder"
