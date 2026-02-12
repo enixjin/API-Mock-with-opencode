@@ -1,0 +1,105 @@
+# OpenAPI Mock Server
+
+An Electron-based desktop application for uploading OpenAPI specifications and running mock servers.
+
+> **Note**: This project was entirely created by [opencode](https://opencode.ai) - an AI coding assistant. No human-written code was involved in the development of this application.
+
+## Features
+
+- **Upload OpenAPI Specifications**: Supports both YAML and JSON formats (OpenAPI 2.0, 3.0.x, and 3.1.x)
+- **Interactive API Documentation**: Visualize your API specs with Swagger UI
+- **Mock Server**: Automatically generates and runs a local HTTP server based on your OpenAPI specification
+- **Cross-Platform**: Built with Electron for macOS, Windows, and Linux support
+
+## Tech Stack
+
+- **Electron 28** - Desktop application framework
+- **Swagger UI 5.31** - API documentation viewer (supports OpenAPI 3.1.x)
+- **Node.js** - Backend runtime
+- **js-yaml** - YAML parsing support
+
+## Installation
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd electron-openapi-mock
+
+# Install dependencies
+npm install
+
+# Run the application
+npm start
+```
+
+## Usage
+
+1. Launch the application
+2. Click "Upload OpenAPI YAML or JSON" button
+3. Select your OpenAPI specification file
+4. The app will:
+   - Validate the specification
+   - Display the API documentation in the Swagger UI tab
+   - Start a mock server at `http://localhost:7070`
+
+## Project Structure
+
+```
+electron-openapi-mock/
+├── main.js              # Main Electron process
+├── index.html           # Frontend UI with Swagger UI integration
+├── preload.js           # Preload script for secure IPC
+├── package.json         # Project configuration
+├── test-openapi.json    # Sample OpenAPI 3.0 spec for testing
+└── test.js             # Test utilities
+```
+
+## Development
+
+### Build for Production
+
+```bash
+npm run build
+```
+
+This will create distributable packages in the `dist/` directory.
+
+### Testing
+
+A sample OpenAPI specification is included (`test-openapi.json`) for testing purposes.
+
+## Mock Server
+
+The mock server runs on port **7070** and:
+- Matches incoming requests against the OpenAPI spec paths
+- Returns example responses defined in the spec
+- Supports path parameters
+- Returns 404 for undefined paths
+
+## Configuration
+
+No additional configuration required. The application automatically:
+- Parses YAML and JSON OpenAPI specifications
+- Validates version fields (swagger or openapi)
+- Cleans and serializes specs for proper IPC communication
+
+## Troubleshooting
+
+### "Unable to render this definition" Error
+
+If you see this error, ensure your OpenAPI specification includes a valid version field:
+- OpenAPI 2.0: `swagger: "2.0"`
+- OpenAPI 3.0.x: `openapi: "3.0.0"` (or 3.0.1, 3.0.2, etc.)
+- OpenAPI 3.1.x: `openapi: "3.1.0"`
+
+## License
+
+MIT
+
+## Credits
+
+This project was entirely built by [opencode](https://opencode.ai) - an AI-powered coding assistant. All code, including architecture, implementation, debugging, and documentation, was generated through AI assistance without human-written code.
+
+## Support
+
+For issues or questions, please refer to the [opencode documentation](https://opencode.ai) or check the project repository.
