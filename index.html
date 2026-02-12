@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>OpenAPI Uploader</title>
+    <link rel="stylesheet" type="text/css" href="./node_modules/swagger-ui-dist/swagger-ui.css" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            background-color: #f0f0f0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .tab-container {
+            display: flex;
+            background-color: #333;
+        }
+        .tab {
+            padding: 15px 30px;
+            color: white;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+        }
+        .tab.active {
+            border-bottom: 3px solid #4CAF50;
+            background-color: #444;
+        }
+        .tab-content {
+            flex: 1;
+            padding: 20px;
+            overflow: auto;
+        }
+        #upload-tab {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        #swagger-tab {
+            display: none;
+            height: 100%;
+        }
+        h1 {
+            color: #333;
+        }
+        button {
+            padding: 15px 30px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            width: 80%;
+            text-align: center;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        #swagger-ui {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="tab-container">
+            <div class="tab active" data-tab="upload-tab">Upload</div>
+            <div class="tab" data-tab="swagger-tab">Swagger UI</div>
+        </div>
+        <div class="tab-content">
+            <div id="upload-tab" class="tab-pane">
+                <h1>OpenAPI Specification Uploader</h1>
+                <button id="upload-btn">Upload OpenAPI YAML or JSON</button>
+                <div id="status"></div>
+            </div>
+            <div id="swagger-tab" class="tab-pane">
+                <div id="swagger-ui"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./node_modules/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script src="./node_modules/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+    <script>
+        // Global state variables - MUST be declared before any event handlers
+        let ui = null;
+        let receivedSpec = null;
+        let isSwaggerTabActive = false;
+        
+        // Tab switching functionality
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                // Hide all tab panes
+                document.querySelectorAll('.tab-pane').forEach(pane => pane.style.display = 'none');
+                // Activate selected tab and show its content
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(tabId).style.display = 'flex';
+                
+                // Track tab state and initialize Swagger UI when tab becomes active
+                if (tabId === 'swagger-tab') {
+                    isSwaggerTabActive = true;
+                    
+                    // Initialize Swagger UI if we have a spec but haven't initialized yet
+                    if (receivedSpec && !ui) {
+                        console.log('Swagger tab activated, initializing Swagger UI');
+                        setTimeout(initializeSwaggerUI, 100);
+                    } else if (ui) {
+                        // Force Swagger UI to resize and re-render
+                        setTimeout(() => {
+                            ui.layout();
+                        }, 100);
+                    }
+                } else {
+                    isSwaggerTabActive = false;
+                }
+            });
+        });
+
+        // Upload button functionality
+        document.getElementById('upload-btn').addEventListener('click', async () => {
+            const statusDiv = document.getElementById('status');
+            
+            try {
+                statusDiv.textContent = 'Uploading...';
+                statusDiv.className = '';
+                
+                const result = await window.electronAPI.openFileDialog();
+                
+                if (result) {
+                    if (result.success) {
+                        statusDiv.textContent = 'Successfully uploaded and started mock server!';
+                        statusDiv.className = 'success';
+                        // Switch to Swagger tab
+                        document.querySelector('.tab[data-tab="swagger-tab"]').click();
+                    } else {
+                        statusDiv.textContent = `Error: ${result.error}`;
+                        statusDiv.className = 'error';
+                    }
+                } else {
+                    statusDiv.textContent = 'Upload cancelled.';
+                    statusDiv.className = '';
+                }
+            } catch (error) {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.className = 'error';
+            }
+        });
+
+        // Receive spec from main process
+        window.electronAPI.onSwaggerSpec((spec) => {
+            console.log('=== RECEIVED SPEC FROM MAIN PROCESS ===');
+            console.log('Raw spec:', spec);
+            console.log('Spec type:', typeof spec);
+            console.log('Spec constructor:', spec?.constructor?.name);
+            console.log('Spec keys:', spec ? Object.keys(spec) : 'null');
+            console.log('Spec has swagger:', !!spec?.swagger);
+            console.log('Spec has openapi:', !!spec?.openapi);
+            console.log('swagger value:', spec?.swagger, '| type:', typeof spec?.swagger);
+            console.log('openapi value:', spec?.openapi, '| type:', typeof spec?.openapi);
+            
+            // Ensure spec is valid
+            if (!spec || typeof spec !== 'object') {
+                console.error('Invalid spec received:', spec);
+                return;
+            }
+            
+            // Handle case where spec might be a different type of object
+            // Convert to plain object if needed
+            let cleanSpec = spec;
+            if (spec.constructor && spec.constructor.name !== 'Object') {
+                console.log('Converting spec to plain object...');
+                try {
+                    cleanSpec = JSON.parse(JSON.stringify(spec));
+                    console.log('Converted spec keys:', Object.keys(cleanSpec));
+                    console.log('Converted swagger:', cleanSpec.swagger);
+                    console.log('Converted openapi:', cleanSpec.openapi);
+                } catch (e) {
+                    console.error('Failed to convert spec:', e);
+                }
+            }
+            
+            // Validate version field type - use 'in' operator to check property existence
+            if ('swagger' in cleanSpec && typeof cleanSpec.swagger !== 'string') {
+                console.error('Invalid swagger field type:', typeof cleanSpec.swagger, cleanSpec.swagger);
+                return;
+            }
+            
+            if ('openapi' in cleanSpec && typeof cleanSpec.openapi !== 'string') {
+                console.error('Invalid openapi field type:', typeof cleanSpec.openapi, cleanSpec.openapi);
+                return;
+            }
+            
+            if (!('swagger' in cleanSpec) && !('openapi' in cleanSpec)) {
+                console.error('Missing version field in spec:', cleanSpec);
+                console.error('All spec keys:', Object.keys(cleanSpec));
+                return;
+            }
+            
+            // Store the spec for later initialization
+            receivedSpec = cleanSpec;
+            console.log('Spec stored successfully, version:', cleanSpec.swagger || cleanSpec.openapi);
+            console.log('isSwaggerTabActive:', isSwaggerTabActive);
+            
+            // Only initialize if Swagger tab is already active
+            if (isSwaggerTabActive) {
+                console.log('Tab is active, initializing Swagger UI now');
+                initializeSwaggerUI();
+            } else {
+                console.log('Tab not active, waiting for user to switch tabs');
+            }
+        });
+        
+        function initializeSwaggerUI() {
+            console.log('=== INITIALIZING SWAGGER UI ===');
+            if (!receivedSpec) {
+                console.error('No spec available for initialization');
+                return;
+            }
+            
+            // Clear any existing Swagger UI content
+            const swaggerUIContainer = document.getElementById('swagger-ui');
+            if (swaggerUIContainer) {
+                console.log('Clearing existing Swagger UI content');
+                swaggerUIContainer.innerHTML = '';
+            }
+            
+            console.log('Initializing Swagger UI with spec:', { 
+                version: receivedSpec.swagger || receivedSpec.openapi,
+                swagger: receivedSpec.swagger,
+                openapi: receivedSpec.openapi,
+                swaggerType: typeof receivedSpec.swagger,
+                openapiType: typeof receivedSpec.openapi,
+                specKeys: Object.keys(receivedSpec),
+                isPlainObject: receivedSpec.constructor === Object
+            });
+            
+            // Ensure we're passing a plain object to Swagger UI
+            let specForUI = receivedSpec;
+            if (receivedSpec.constructor !== Object) {
+                console.log('Converting spec to plain object for Swagger UI');
+                try {
+                    specForUI = JSON.parse(JSON.stringify(receivedSpec));
+                    console.log('Converted spec version:', specForUI.swagger || specForUI.openapi);
+                } catch (e) {
+                    console.error('Failed to convert spec:', e);
+                }
+            }
+            
+            try {
+                // Create new Swagger UI instance
+                ui = SwaggerUIBundle({
+                    spec: specForUI,
+                    dom_id: '#swagger-ui',
+                    deepLinking: true,
+                    presets: [
+                        SwaggerUIBundle.presets.apis,
+                        SwaggerUIStandalonePreset
+                    ],
+                    plugins: [
+                        SwaggerUIBundle.plugins.DownloadUrl
+                    ],
+                    layout: "StandaloneLayout",
+                    onComplete: function() {
+                        console.log('Swagger UI rendered successfully');
+                    },
+                    onFailure: function(err) {
+                        console.error('Swagger UI failed to render:', err);
+                        document.getElementById('swagger-ui').innerHTML = '<div style="padding: 20px; color: red;"><strong>Error loading API documentation:</strong><br>' + err + '</div>';
+                    }
+                });
+                window.ui = ui;
+                
+                console.log('Swagger UI initialized successfully');
+            } catch (error) {
+                console.error('Error initializing Swagger UI:', error);
+                document.getElementById('swagger-ui').innerHTML = '<div style="padding: 20px; color: red;"><strong>Error initializing Swagger UI:</strong><br>' + error.message + '</div>';
+            }
+        }
+    </script>
+</body>
+</html>
